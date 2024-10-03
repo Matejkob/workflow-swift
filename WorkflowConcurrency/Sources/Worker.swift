@@ -29,6 +29,9 @@ public protocol Worker<Output>: AnyWorkflowConvertible where Rendering == Void {
     /// The type of output events returned by this worker.
     associatedtype Output
 
+    /// Task priority to use to run the async function.
+    var priority: TaskPriority? { get }
+
     /// Execute the work represented by this worker asynchronously and return the result.
     func run() async -> Output
     /// Returns `true` if the other worker should be considered equivalent to `self`. Equivalence should take into
@@ -38,6 +41,8 @@ public protocol Worker<Output>: AnyWorkflowConvertible where Rendering == Void {
 }
 
 extension Worker {
+    public var priority: TaskPriority? { nil }
+
     public func asAnyWorkflow() -> AnyWorkflow<Void, Output> {
         WorkerWorkflow(worker: self).asAnyWorkflow()
     }
@@ -63,7 +68,7 @@ struct WorkerWorkflow<WorkerType: Worker>: Workflow {
         let sink = context.makeOutputSink()
         context.runSideEffect(key: state) { lifetime in
             let send: @MainActor(Output) -> Void = sink.send
-            let task = Task {
+            let task = Task(priority: worker.priority) {
                 logger.logStarted()
                 let output = await worker.run()
                 if Task.isCancelled {

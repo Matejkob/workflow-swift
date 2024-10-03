@@ -124,6 +124,50 @@ final class AsyncOperationWorkerTests: XCTestCase {
 
         wait(for: [endExpectation], timeout: 1.0)
     }
+
+    func testPriority() {
+        struct TestPriorityWorkerWorkflow: Workflow {
+            typealias State = Int
+            typealias Rendering = Int
+
+            let key: String
+
+            func makeInitialState() -> Int { 0 }
+
+            func render(state: Int, context: RenderContext<TestPriorityWorkerWorkflow>) -> Int {
+                AsyncOperationWorker(priority: .userInitiated, outputOne)
+                    .mapOutput { output in
+                        AnyWorkflowAction { state in
+                            state += output
+                            return nil
+                        }
+                    }
+                    .running(in: context, key: key)
+                return state
+            }
+
+            func outputOne() async -> Int {
+                XCTAssertEqual(Task.currentPriority, TaskPriority.userInitiated)
+                return 1
+            }
+        }
+
+        let host = WorkflowHost(
+            workflow: TestPriorityWorkerWorkflow(key: "")
+        )
+
+        let expectation = XCTestExpectation()
+        let disposable = host.rendering.signal.observeValues { rendering in
+            expectation.fulfill()
+        }
+
+        XCTAssertEqual(0, host.rendering.value)
+
+        wait(for: [expectation], timeout: 1.0)
+        XCTAssertEqual(1, host.rendering.value)
+
+        disposable?.dispose()
+    }
 }
 
 private struct TestAsyncOperationWorkerWorkflow: Workflow {

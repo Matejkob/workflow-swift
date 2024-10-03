@@ -44,9 +44,11 @@ import Workflow
 /// ```
 
 public struct AsyncOperationWorker<OutputType>: Worker {
+    public let priority: TaskPriority?
     private let operation: () async -> OutputType
 
-    public init(_ operation: @escaping () async -> OutputType) {
+    public init(priority: TaskPriority? = nil, _ operation: @escaping () async -> OutputType) {
+        self.priority = priority
         self.operation = operation
     }
 
